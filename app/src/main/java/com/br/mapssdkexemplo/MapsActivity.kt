@@ -10,6 +10,7 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.br.mapssdkexemplo.databinding.ActivityMapsBinding
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
@@ -28,21 +29,26 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         mapFragment.getMapAsync(this)
     }
 
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
 
-        // Add a marker in Sydney and move the camera
-        val sydney = LatLng(-34.0, 151.0)
-        mMap.addMarker(MarkerOptions().position(sydney).title("Marker in Sydney"))
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney))
+        /* 1 - Tipo de mapa: NONE, NORMAL, SATELLITE, TERRAIN, HYBRID  */
+        mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID)
+
+        /* 2 -  Marcador de PIN inicial e move camera */
+        val userLocal = LatLng(-19.933701907118405, -43.93631614196182)
+        mMap.addMarker(
+            MarkerOptions()
+                .position(userLocal)
+                .title("PUC Minas")
+                /* Apresenta Subtítulo ao clicar na home */
+                .snippet("Unidade Praça da Liberdade")
+                /* Ícone armazenado em drawable */
+                .icon(BitmapDescriptorFactory.fromResource(R.drawable.home)))
+
+        /* 3 - Centralizar câmera e Configurar Zoom de 2 a 21 */
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocal, 19.0f))
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(userLocal))
+
     }
 }
