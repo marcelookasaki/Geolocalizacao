@@ -1,7 +1,9 @@
 package com.br.mapssdkexemplo
 
+import android.graphics.Color
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.widget.Toast
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -11,6 +13,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.br.mapssdkexemplo.databinding.ActivityMapsBinding
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.CircleOptions
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
@@ -49,6 +52,33 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         /* 3 - Centralizar câmera e Configurar Zoom de 2 a 21 */
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocal, 19.0f))
         mMap.moveCamera(CameraUpdateFactory.newLatLng(userLocal))
+
+        /* 4 - Clique longo retorna: a latitude e longitude do local do clique em um Toast */
+        mMap.setOnMapLongClickListener { LatLng ->
+            val myLatitude = LatLng.latitude
+            val myLongitude = LatLng.longitude
+            Toast.makeText(
+                applicationContext,
+                "Latitude: $myLatitude e Longitude: $myLongitude",
+                Toast.LENGTH_LONG
+            ).show()
+
+            /* 5 - Adiciona ícone de helicóptero ao clicar */
+            mMap.addMarker(
+                MarkerOptions()
+                    .position(LatLng)
+                    .title("Ponto adicional")
+                    /* Adiciona ícone armazenado em drawable */
+                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.heliponto))
+            )
+
+            /* 6 - Adicionar Círculo nos Helipontos com raio de 2km */
+            mMap.addCircle(
+                CircleOptions().center(LatLng).radius(200.0).strokeWidth(5.0f)
+                    .strokeColor(Color.WHITE).fillColor(Color.argb(110, 100, 200, 200))
+            )
+
+        }
 
     }
 }
