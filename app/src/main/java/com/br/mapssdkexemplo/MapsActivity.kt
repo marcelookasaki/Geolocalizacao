@@ -1,6 +1,7 @@
 package com.br.mapssdkexemplo
 
 import android.graphics.Color
+import android.location.Geocoder
 import android.location.Location
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -12,6 +13,8 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.br.mapssdkexemplo.databinding.ActivityMapsBinding
 import com.google.android.gms.maps.model.*
+import java.io.IOException
+import java.util.*
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
@@ -121,7 +124,85 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             polygonOptions.strokeWidth(5.0f).strokeColor(Color.WHITE)
                 .fillColor(Color.argb(110, 100, 200, 200))
             mMap.addPolygon(polygonOptions)
+
+            /* 14e - Teste do Reverse Geocoding */
+            val reverseGeo: String? = reverseGeocoding(puc)
+            if (reverseGeo != null) {
+                Toast.makeText(
+                    applicationContext,
+                    "Reverse Geocoding: $reverseGeo",
+                    Toast.LENGTH_LONG).show()
+            }
         }
 
+        /* 10 - Adicionar Icone do drone ao digitar um endereço e retornar um Toast com lat/long */
+        binding.btnADD.setOnClickListener {
+            if (binding.etDestino.text.toString() != "") {
+                var geoloc = geocoding(binding.etDestino.text.toString())
+                if (geoloc != null) {
+                    Toast.makeText(
+                        applicationContext,
+                        "Local encontrado: Latitude: ${geoloc.latitude}, Longitude: ${geoloc.longitude}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    val droneLocal = LatLng(geoloc.latitude, geoloc.longitude)
+                    //setLinha(userLocal, droneLocal)
+                    mMap.addMarker(
+                        MarkerOptions()
+                            .position(geoloc)
+                            .title("Ponto adicional")
+                            .icon(BitmapDescriptorFactory.fromResource(R.drawable.drone))
+                    )
+                } else {
+                    Toast.makeText(
+                        applicationContext,
+                        "Local não encontrado!",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            } else {
+                Toast.makeText(applicationContext, "Digite o nome do local!", Toast.LENGTH_LONG)
+                    .show()
+
+            }
+        } /* Fim setOnClickListener*/
+    } /* Fim onMapReady */
+
+
+
+    /* 13 - Geocoding → transformar endereço em coordenadas */
+    fun geocoding(descricaoLocal: String): LatLng? {
+        val geocoder = Geocoder(
+            applicationContext,
+            Locale.getDefault()
+        ) /* Locale representa uma região específica */
+        try {
+            val local = geocoder.getFromLocationName(descricaoLocal, 1)
+            if (local != null && local.size > 0) {
+                var destino = LatLng(local[0].latitude, local[0].longitude)
+                return destino
+            }
+        } catch (e: IOException) {
+            e.message
+        }
+        return null
+    }
+
+    /* 14 - Transforma coordenadas em endereço ou descrição */
+    fun reverseGeocoding(latlang: LatLng): String? {
+        val geocoder = Geocoder(
+            applicationContext,
+            Locale.getDefault()
+        )
+        /* Locale representa uma região específica */
+        try {
+            val local = geocoder.getFromLocation(latlang.latitude, latlang.longitude, 1)
+            if (local != null && local.size > 0) {
+                return local[0].getAddressLine(0).toString()
+            }
+        } catch (e: IOException) {
+            e.message
+        }
+        return null
     }
 }
