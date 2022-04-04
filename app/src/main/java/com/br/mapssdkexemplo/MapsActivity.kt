@@ -1,11 +1,21 @@
 package com.br.mapssdkexemplo
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.app.AlertDialog
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.location.Geocoder
 import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -20,6 +30,17 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
     private lateinit var binding: ActivityMapsBinding
+
+    /* Responsável por "rastrear" eventos relacionados a geolocalização */
+    private var locationListener: LocationListener? = null
+
+    /* Reponsável por gerenciar / configurar o rastreamento da geolocalização */
+    private var locationManager: LocationManager? = null
+
+    /* Marcador de posição do dispositivo */
+    private var usermaker: Marker? = null
+    /* Verifica se o mapa está pronto ou não */
+    private var isMapReady: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -133,7 +154,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     "Reverse Geocoding: $reverseGeo",
                     Toast.LENGTH_LONG).show()
             }
-        }
+        } /* Fim setOnMapLongClickListener */
 
         /* 10 - Adicionar Icone do drone ao digitar um endereço e retornar um Toast com lat/long */
         binding.btnADD.setOnClickListener {
@@ -146,7 +167,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                         Toast.LENGTH_LONG
                     ).show()
                     val droneLocal = LatLng(geoloc.latitude, geoloc.longitude)
-                    //setLinha(userLocal, droneLocal)
+                    setLinha(userLocal, droneLocal)
                     mMap.addMarker(
                         MarkerOptions()
                             .position(geoloc)
@@ -163,11 +184,59 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             } else {
                 Toast.makeText(applicationContext, "Digite o nome do local!", Toast.LENGTH_LONG)
                     .show()
-
             }
         } /* Fim setOnClickListener*/
+
+        /* 11) Location Listener - Atualiza o marcador de geolocalização conforme posição geográfica do dispositivo */
+        locationListener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                val userPosition = LatLng(location.latitude, location.longitude)
+
+                if (usermaker != null) {
+                    /* Remove marcadores anteriores */
+                    usermaker!!.remove()
+                }
+                /* Adiciona marcadores */
+                usermaker = mMap.addMarker(
+                    MarkerOptions()
+                        .position(userPosition)
+                        .title("Minha localização")
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.home))
+                )
+                /* Move camera para a posição no user */
+                mMap.moveCamera(
+                    CameraUpdateFactory.newLatLngZoom(
+                        userPosition,
+                        15.0f
+                    )
+                )
+            }
+        }
+        isMapReady = true
+        checkPermission()
+        setupLocation()
+
     } /* Fim onMapReady */
 
+    /* 12 - Cria linha entre usuário e drone */
+    fun setLinha(startPoint: LatLng, endPoint: LatLng) {
+        // Criar linhas
+        var polylineOptions = PolylineOptions()
+        polylineOptions?.add(startPoint)
+        polylineOptions?.add(endPoint)
+        // Verificar distância entre pontos.
+        val results = FloatArray(1)
+        Location.distanceBetween(startPoint.latitude, startPoint.longitude, endPoint.latitude, endPoint.longitude, results)
+        if (results[0] <= 500.0f) {
+            // Se a distância for inferior a 500m, configurar cor da linha para verde
+            polylineOptions?.color(Color.GREEN)?.width(20.0f)
+        } else {
+            // Se a distância for inferior a 500m, configurar cor da linha para vermelha
+            polylineOptions?.color(Color.RED)?.width(20.0f)
+        }
+
+        mMap.addPolyline(polylineOptions)
+    }
 
 
     /* 13 - Geocoding → transformar endereço em coordenadas */
@@ -204,5 +273,75 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             e.message
         }
         return null
+    }
+
+    /* Permissões: */
+
+    /* A ) Validar permissões em tempo de execução (necessário para API 23 ou superior) */
+    fun checkPermission() {
+        if (Build.VERSION.SDK_INT >= 23) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "Permissões Ativadas", Toast.LENGTH_SHORT).show()
+            } else if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
+                /* Em uma IU educacional, explique ao usuário por que seu aplicativo requer esta permissão para um recurso específico se comportar conforme o
+                esperado. Nesta IU, inclua um botão "cancelar" ou "não, obrigado" que permite ao usuário continue usando seu aplicativo sem conceder a permissão */
+                alertaPermissaoNegada()
+            } else {
+                requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                /* Pedir permissão diretamente. O ActivityResultCallback registrado obtém o resultado desta solicitação (abaixo) */
+            }
+        }
+    }
+    /* B) Calback que exibe a janela de solicitação de permissão */
+    val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            /* Método acoplado para setar a localização */
+            setupLocation()
+        }
+    }
+
+    /* C) Exibir IU educacional (recomendação do Google) → caixas de alerta */
+    fun alertaPermissaoNegada() {
+        val alert = AlertDialog.Builder(this)
+        alert.setTitle("Permissões Requeridas")
+        alert.setMessage("Para continuar utilizando todos os recursos do aplicativo, é altamente recomendado autorizar o acesso a sua localização.")
+        /* Evita o cancelamento do alert ao clicar fora da caixa */
+        alert.setCancelable(false)
+        alert.setPositiveButton(
+            "Corrigir"
+        ) { dialog, which ->
+            requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        alert.setNegativeButton(
+            "Cancelar"
+        ) { dialog, which ->
+            Toast.makeText(getApplicationContext(), "Algumas das funcionalidades do app foram desabilitadas.", Toast.LENGTH_LONG).show();
+            /* Nunca Utilizar o comendo finish(). Fechar o app é uma prática pouco recomendada */
+        }
+        val alertDialog = alert.create()
+        alertDialog.show()
+    }
+
+    /* D) Configurar a Geolocalização */
+    @SuppressLint("MissingPermission")
+    fun setupLocation() {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            /* requestLocationUpdates(String provider, long minTimeMs, float minDistanceM, LocationListener listener)
+            1) provider - String: um provedor listado por getAllProviders() Este valor não pode ser null.(LocationManager.GPS_PROVIDER neste caso)
+            2) miTimeMs - long: Intervalo mínimo de tempo entre as atualizações de localização em milissegundos(1000 ms neste caso)
+            3) minDistanceM: float: distância mínima entre atualizações de localização em metros
+            4) listener: LocationListener: o ouvinte que receberá atualizações de localização Este valor não pode ser null.
+            https://developer.android.com/reference/android/location/LocationManager#requestLocationUpdates(java.lang.String,%20long,%20float,%20android.location.LocationListener)*/
+            locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+            locationManager?.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER, 1000, 10f, locationListener!!
+            )
+        }
     }
 }
